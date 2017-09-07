@@ -37,6 +37,12 @@ NachOSThread::NachOSThread(char* threadName)
     NumOfInstructions = 0; // added by me.
     numThreadsCreated++; // added by me
     ThreadCount++;  //added by me
+    listOfChildren = new int[MAX_THREADS];
+    ChildStatus = new int[MAX_THREADS];
+    ChildCount = 0;
+
+    IsWaiting = new bool[MAX_THREADS];
+
     name = threadName;
     stackTop = NULL;
     stack = NULL;
@@ -361,4 +367,32 @@ void forknew(int arg){
 #endif
 
     machine->Run();
+}
+
+void
+NachOSThread::insertChild(int cpid) {
+    listOfChildren[ChildCount] = cpid;
+    ChildStatus[ChildCount] = CHILD_ALIVE;
+    IsWaiting[ChildCount] = FALSE;
+    ++ChildCount;
+}
+
+int
+NachOSThread::searchChild(int cpid) {
+    unsigned i;
+    bool found = FALSE;
+    for(i=0 ; i<ChildCount ; ++i) {
+        if(listOfChildren[i] == cpid) {
+            found = TRUE;
+            if(ChildStatus[i] == CHILD_ALIVE) {
+                IsWaiting[i]=TRUE;
+                IntStatus oldLevel = interrupt->SetLevel(IntOff);
+                this->PutThreadToSleep();
+                (void) interrupt->SetLevel(oldLevel);
+
+            }    
+            return ChildStatus[i];
+        }
+    }
+    if(!found) return -1; // redundant 'if' check...
 }

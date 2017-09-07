@@ -51,6 +51,13 @@
 #define MachineStateSize 18 
 
 
+//assuming positive child return status.
+#define MAX_THREADS 1000  //max number of allowed threads per program.
+#define PARENT_WAITING -3
+#define CHILD_ALIVE -2
+#define CHILD_NOT_FOUND -1
+#define CHILD_DEAD -4
+
 // Size of the thread's private execution stack.
 // WATCH OUT IF THIS ISN'T BIG ENOUGH!!!!!
 #define StackSize	(4 * 1024)	// in words
@@ -110,6 +117,10 @@ class NachOSThread {
     int getpid(){ return pid; } //added by me
     int getppid(){ return ppid; } // added by me
     static int getThreadCount(){ return ThreadCount; } //added by me.
+
+    void insertChild(int pid);
+    int searchChild(int cpid);
+    int getChildCount(){ return ChildCount; }
   private:
     // some of the private data for this class is listed above
     
@@ -124,6 +135,10 @@ class NachOSThread {
 					// Used internally by ThreadFork()
 
     int pid, ppid;			// My pid and my parent's pid
+    int *listOfChildren;   //list of children
+    int ChildCount;
+    int *ChildStatus;
+    int *IsWaiting;  // if parent is waiting for corresponding child;
 
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers -- 

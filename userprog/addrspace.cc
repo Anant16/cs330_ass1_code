@@ -115,6 +115,44 @@ ProcessAddressSpace::ProcessAddressSpace(OpenFile *executable)
 
 }
 
+
+ProcessAddressSpace::ProcessAddressSpace(ProcessAddressSpace *parentSpace)
+{
+    numVirtualPages = parentSpace->getNumVirtualPages();
+    unsigned i, size = numVirtualPages * PageSize;
+
+    ASSERT(numVirtualPages + numPagesAllocated <= NumPhysPages);        // check we're not trying
+                        // to run anything too big --
+                        // at least until we have
+                        // virtual memory
+
+    DEBUG('a', "Initializing address space, num pages %d, size %d\n", 
+                    numVirtualPages, size);
+// first, set up the translation 
+    TranslationEntry* parentPageTable = parentSpace->GetPageTable();
+
+    KernelPageTable = new TranslationEntry[numVirtualPages];
+    for (i = 0; i < numVirtualPages; i++) {
+    KernelPageTable[i].virtualPage = i; // for now, virtual page # = phys page #
+    KernelPageTable[i].physicalPage = i+numPagesAllocated;
+    KernelPageTable[i].valid = parentPageTable[i].valid;
+    KernelPageTable[i].use = parentPageTable[i].use;
+    KernelPageTable[i].dirty = parentPageTable[i].dirty;
+    KernelPageTable[i].readOnly = parentPageTable[i].readOnly;  // if the code segment was entirely on 
+                    // a separate page, we could set its 
+                    // pages to be read-only
+    }
+
+    unsigned startAddrParent = parentPageTable[0].physicalPage * PageSize;
+    unsigned startAddrChild = numPagesAllocated * PageSize;
+
+    for(i=0; i < size; ++i){
+        machine->mainMemory[startAddrChild + i] = machine->mainMemory[startAddrParent + i];
+    }
+
+    numPagesAllocated += numVirtualPages ;
+}
+
 //----------------------------------------------------------------------
 // ProcessAddressSpace::~ProcessAddressSpace
 // 	Dealloate an address space.  Nothing for now!

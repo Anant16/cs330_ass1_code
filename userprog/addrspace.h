@@ -31,6 +31,10 @@ class ProcessAddressSpace {
     void SaveContextOnSwitch();			// Save/restore address space-specific
     void RestoreContextOnSwitch();		// info on a context switch 
 
+    unsigned GetNumVirtualPages(){ return numVirtualPages; }
+
+    TranslationEntry *GetPageTable(){ return KernelPageTable; }
+
   private:
     TranslationEntry *KernelPageTable;	// Assume linear page table translation
 					// for now!

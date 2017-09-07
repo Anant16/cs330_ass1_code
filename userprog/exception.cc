@@ -271,6 +271,29 @@ ExceptionHandler(ExceptionType which)
 
 
     }
+
+    else if ((which == SyscallException) && (type == SysCall_NumInstr)) {
+
+        machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
+        machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
+        machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
+
+        NachOSThread * childThread = new NachOSThread("Forked Child");
+
+        childThread->space = new ProcessAddressSpace(currentThread->space);
+
+        machine->WriteRegister(2, 0);
+        childThread->SaveUserState();
+
+        childThread->CreateThreadStack(&forknew, 0);
+
+        IntStatus oldLevel = interrupt->SetLevel(IntOff);
+        scheduler->MoveThreadToReadyQueue(childThread);
+        (void) interrupt->SetLevel(oldLevel);
+
+        machine->WriteRegister(2, childThread->getpid());
+
+    }
     else {
 	printf("Unexpected user mode exception %d %d\n", which, type);
 	ASSERT(FALSE);

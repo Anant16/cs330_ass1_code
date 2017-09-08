@@ -97,6 +97,8 @@ class NachOSThread {
 					// must not be running when delete 
 					// is called
 
+
+
     // basic thread operations
 
     void ThreadFork(VoidFunctionPtr func, int arg); 	// Make thread run (*func)(arg)
@@ -118,12 +120,19 @@ class NachOSThread {
     int getppid(){ return ppid; } // added by me
     static int getThreadCount(){ return ThreadCount; } //added by me.
 
-    void insertChild(int pid);
+    void insertChild(NachOSThread *child);
     int searchChild(int cpid);
     int getChildCount(){ return ChildCount; }
+    NachOSThread *getParent(){ return parent; }
+
+    void WakeMeIfWaiting(int cpid, int exitcode);
+    void actionForParentWaiting(int exitcode);
+    void setParentToNULL(){ parent = NULL; }
+    void tellChildrenImDying();
   private:
     // some of the private data for this class is listed above
     
+    NachOSThread *parent; 
     int* stack; 	 		// Bottom of the stack 
 					// NULL if this is the main thread
 					// (If NULL, don't deallocate stack)
@@ -135,10 +144,11 @@ class NachOSThread {
 					// Used internally by ThreadFork()
 
     int pid, ppid;			// My pid and my parent's pid
-    int *listOfChildren;   //list of children
+    int *ChildPid;   //list of children
     int ChildCount;
     int *ChildStatus;
-    int *IsWaiting;  // if parent is waiting for corresponding child;
+    bool *IsWaiting;  // if parent is waiting for corresponding child;
+    NachOSThread **ChildList;
 
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers -- 
@@ -168,5 +178,8 @@ void _ThreadRoot();
 // Stop running oldThread and start running newThread
 void _SWITCH(NachOSThread *oldThread, NachOSThread *newThread);
 }
+
+
+
 
 #endif // THREAD_H

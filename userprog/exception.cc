@@ -70,15 +70,37 @@ static void ConvertIntToHex (unsigned v, Console *console)
    }
 }
 
+void forknew(int arg){
+
+    DEBUG('t', "Now in thread \"%s\"\n", currentThread->getName());
+
+        // If the old thread gave up the processor because it was finishing,
+            // we need to delete its carcass.  Note we cannot delete the thread 
+            // before now (for example, in NachOSThread::FinishThread()), because up to this
+           // point, we were still running on the old thread's st
+    if (threadToBeDestroyed != NULL) {
+        delete threadToBeDestroyed;
+        threadToBeDestroyed = NULL;
+    }
+                                            
+       #ifdef USER_PROGRAM
+     if (currentThread->space != NULL) {     // if there is an address space
+            currentThread->RestoreUserState();     // to restore, do it.
+            currentThread->space->RestoreContextOnSwitch();
+    }
+         machine->Run();
+        #endif
+}
+
 void
 ExceptionHandler(ExceptionType which)
 {
     int type = machine->ReadRegister(2);
-    int memval, vaddr, printval, tempval, exp, regno;
+    int memval, vaddr, printval, tempval, exp, regno, exitcode;
     TranslationEntry *entry;
     OpenFile *executable;
     ProcessAddressSpace *space;
-    unsigned int vpgno, offset, pageFrame, tpid, tppid;
+    unsigned int vpgno, offset, pageFrame, tpid, tppid, cpid;
     unsigned printvalus;        // Used for printing in hex
     if (!initializedConsoleSemaphores) {
        readAvail = new Semaphore("read avail", 0);
@@ -257,10 +279,8 @@ ExceptionHandler(ExceptionType which)
         machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
 
     }
- /*   else if ((which == SyscallException) && (type == SysCall_Exit)) {
-        currentThread->FinishThread();
-    }
- */ 
+
+  
     
     else if ((which == SyscallException) && (type == SysCall_NumInstr)) {
         machine->WriteRegister(2, currentThread->getNumOfInstructions());
@@ -272,28 +292,56 @@ ExceptionHandler(ExceptionType which)
 
     }
 
-    else if ((which == SyscallException) && (type == SysCall_NumInstr)) {
+    else if ((which == SyscallException) && (type == SysCall_Fork)) {
 
         machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
         machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
         machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
 
         NachOSThread * childThread = new NachOSThread("Forked Child");
-
         childThread->space = new ProcessAddressSpace(currentThread->space);
+        currentThread->insertChild(childThread);
 
         machine->WriteRegister(2, 0);
         childThread->SaveUserState();
 
-        childThread->CreateThreadStack(&forknew, 0);
-
-        IntStatus oldLevel = interrupt->SetLevel(IntOff);
-        scheduler->MoveThreadToReadyQueue(childThread);
-        (void) interrupt->SetLevel(oldLevel);
+        childThread->ThreadFork(&forknew, 0);
 
         machine->WriteRegister(2, childThread->getpid());
 
     }
+
+    else if ((which == SyscallException) && (type == SysCall_Join)) {
+
+    	cpid = machine->ReadRegister(4);
+    	exitcode = currentThread->searchChild(cpid);  //also checks if it is valid child_pid or not
+    	machine->WriteRegister(2, exitcode);
+
+    	machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
+        machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
+        machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
+
+    }
+
+    else if ((which == SyscallException) && (type == SysCall_Exit)) {
+        exitcode = machine->ReadRegister(4);
+
+        if(NachOSThread::getThreadCount() == 1) {    // if only one thread is left and is about to die.
+        	interrupt -> Halt();
+        }
+
+        if(currentThread -> getParent() != NULL) {
+        	currentThread -> actionForParentWaiting(exitcode);
+        }
+        
+        currentThread->tellChildrenImDying();
+        currentThread->FinishThread();
+
+        machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
+        machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
+        machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
+    }
+
     else {
 	printf("Unexpected user mode exception %d %d\n", which, type);
 	ASSERT(FALSE);

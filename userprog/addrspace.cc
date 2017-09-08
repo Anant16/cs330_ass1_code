@@ -118,7 +118,7 @@ ProcessAddressSpace::ProcessAddressSpace(OpenFile *executable)
 
 ProcessAddressSpace::ProcessAddressSpace(ProcessAddressSpace *parentSpace)
 {
-    numVirtualPages = parentSpace->getNumVirtualPages();
+    numVirtualPages = parentSpace->GetNumVirtualPages();
     unsigned i, size = numVirtualPages * PageSize;
 
     ASSERT(numVirtualPages + numPagesAllocated <= NumPhysPages);        // check we're not trying

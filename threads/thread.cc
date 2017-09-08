@@ -37,8 +37,9 @@ NachOSThread::NachOSThread(char* threadName)
     NumOfInstructions = 0; // added by me.
     numThreadsCreated++; // added by me
     ThreadCount++;  //added by me
-    listOfChildren = new int[MAX_THREADS];
+    ChildPid = new int[MAX_THREADS];
     ChildStatus = new int[MAX_THREADS];
+    ChildList = new NachOSThread*[MAX_THREADS];
     ChildCount = 0;
 
     IsWaiting = new bool[MAX_THREADS];
@@ -49,10 +50,12 @@ NachOSThread::NachOSThread(char* threadName)
     status = JUST_CREATED;
     pid = numThreadsCreated;   // added by me
     if(currentThread == NULL){
-        ppid = 0;
+        ppid = -1;
+        parent = NULL;
     }
     else{
         ppid = currentThread->getpid(); // added by me
+        parent = currentThread;
     }
 #ifdef USER_PROGRAM
     space = NULL;
@@ -62,7 +65,7 @@ NachOSThread::NachOSThread(char* threadName)
 
 // added by me:
 int NachOSThread :: numThreadsCreated = 0; // added by me
-int NachOSThread :: ThreadCount = 1; //added by me
+int NachOSThread :: ThreadCount = 0; //added by me
 //----------------------------------------------------------------------
 // NachOSThread::~NachOSThread
 // 	De-allocate a thread.
@@ -343,35 +346,14 @@ NachOSThread::RestoreUserState()
     stateRestored = true;
 }
 
-#endif
 
 
-void forknew(int arg){
 
-    DEBUG('t', "Now in thread \"%s\"\n", currentThread->getName());
-
-    // If the old thread gave up the processor because it was finishing,
-    // we need to delete its carcass.  Note we cannot delete the thread
-    // before now (for example, in NachOSThread::FinishThread()), because up to this
-    // point, we were still running on the old thread's stack!
-    if (threadToBeDestroyed != NULL) {
-        delete threadToBeDestroyed;
-    threadToBeDestroyed = NULL;
-    }
-    
-#ifdef USER_PROGRAM
-    if (currentThread->space != NULL) {     // if there is an address space
-        currentThread->RestoreUserState();     // to restore, do it.
-    currentThread->space->RestoreContextOnSwitch();
-    }
-#endif
-
-    machine->Run();
-}
 
 void
-NachOSThread::insertChild(int cpid) {
-    listOfChildren[ChildCount] = cpid;
+NachOSThread::insertChild(NachOSThread *child) {
+    ChildPid[ChildCount] = child->getpid();
+    ChildList[ChildCount] = child;
     ChildStatus[ChildCount] = CHILD_ALIVE;
     IsWaiting[ChildCount] = FALSE;
     ++ChildCount;
@@ -382,7 +364,7 @@ NachOSThread::searchChild(int cpid) {
     unsigned i;
     bool found = FALSE;
     for(i=0 ; i<ChildCount ; ++i) {
-        if(listOfChildren[i] == cpid) {
+        if(ChildPid[i] == cpid) {
             found = TRUE;
             if(ChildStatus[i] == CHILD_ALIVE) {
                 IsWaiting[i]=TRUE;
@@ -394,5 +376,42 @@ NachOSThread::searchChild(int cpid) {
             return ChildStatus[i];
         }
     }
-    if(!found) return -1; // redundant 'if' check...
+    return -1; // redundant 'if' check...
 }
+
+// called by alive parent of any child to wake it up if it is waiting for that child.
+void
+NachOSThread::WakeMeIfWaiting(int cpid, int exitcode) {
+    unsigned i;
+    for(i=0 ; i<ChildCount ; ++i) {
+        if(ChildPid[i] == cpid) {
+            ChildStatus[i] = exitcode;
+            if(IsWaiting[i]){
+                IsWaiting[i] = FALSE; 
+                IntStatus oldLevel = interrupt->SetLevel(IntOff);
+                scheduler->MoveThreadToReadyQueue(this);    // MoveThreadToReadyQueue assumes that interrupts 
+                                                   // are disabled!
+                (void) interrupt->SetLevel(oldLevel);
+            }   
+            break;
+        }
+    }
+}
+
+// Checks if parent is waiting and if yes then wakes it up.
+void
+NachOSThread::actionForParentWaiting(int exitcode) {
+    parent->WakeMeIfWaiting(this->getpid(), exitcode);
+}
+
+void
+NachOSThread::tellChildrenImDying() {
+    unsigned i;
+    for(i=0; i<ChildCount; ++i) {
+        if(ChildStatus[i] == CHILD_ALIVE) {
+            ChildList[i]->setParentToNULL();
+        } 
+    }
+}
+
+#endif

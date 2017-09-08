@@ -70,10 +70,10 @@ TimerInterruptHandler(int dummy)
     }
 
     int key;
-    Thread *readyThread;
+    NachOSThread *readyThread;
 
     while(!(timerQueue->IsEmpty()) && timerQueue->firstKey()<=stats->totalTicks){
-        readyThread=(Thread*)timerQueue->SortedRemove(&key);
+        readyThread=(NachOSThread*)timerQueue->SortedRemove(&key);
 
         scheduler->MoveThreadToReadyQueue(readyThread);
     }

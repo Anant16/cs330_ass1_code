@@ -29,6 +29,7 @@ extern Interrupt *interrupt;			// interrupt status
 extern Statistics *stats;			// performance metrics
 extern Timer *timer;				// the hardware alarm clock
 extern unsigned numPagesAllocated;   // the num of pages allocated so far by the machine.
+extern List *timerQueue;
 
 
 extern bool initializedConsoleSemaphores;       // Used to initialize the semaphores for console I/O exactly once

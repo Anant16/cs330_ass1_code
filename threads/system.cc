@@ -18,6 +18,7 @@ Interrupt *interrupt;			// interrupt status
 Statistics *stats;			// performance metrics
 Timer *timer;				// the hardware timer device,
 					// for invoking context switches
+List *timerQueue;
 unsigned numPagesAllocated;
 
 #ifdef FILESYS_NEEDED
@@ -61,9 +62,21 @@ extern void Cleanup();
 //----------------------------------------------------------------------
 static void
 TimerInterruptHandler(int dummy)
-{
-    if (interrupt->getStatus() != IdleMode)
-	interrupt->YieldOnReturn();
+{   //check it anant
+    //if (interrupt->getStatus() != IdleMode)
+	//interrupt->YieldOnReturn();
+    if(timerQueue->IsEmpty()){
+        return;
+    }
+
+    int key;
+    Thread *readyThread;
+
+    while(!(timerQueue->IsEmpty()) && timerQueue->firstKey()<=stats->totalTicks){
+        readyThread=(Thread*)timerQueue->SortedRemove(&key);
+
+        scheduler->MoveThreadToReadyQueue(readyThread);
+    }
 }
 
 //----------------------------------------------------------------------
@@ -138,6 +151,7 @@ Initialize(int argc, char **argv)
     interrupt = new Interrupt;			// start up interrupt handling
     scheduler = new ProcessScheduler();		// initialize the ready queue
     //if (randomYield)				// start the timer (if needed)
+    timerQueue = new List();
 	timer = new Timer(TimerInterruptHandler, 0, randomYield);
 
     threadToBeDestroyed = NULL;

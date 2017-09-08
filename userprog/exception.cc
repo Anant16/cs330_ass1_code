@@ -96,7 +96,7 @@ void
 ExceptionHandler(ExceptionType which)
 {
     int type = machine->ReadRegister(2);
-    int memval, vaddr, printval, tempval, exp, regno, exitcode;
+    int memval, vaddr, printval, tempval, exp, regno, exitcode, num_ticks;
     TranslationEntry *entry;
     OpenFile *executable;
     ProcessAddressSpace *space;
@@ -340,6 +340,43 @@ ExceptionHandler(ExceptionType which)
         machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
         machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
         machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
+    }
+
+
+    //shaswat's :
+	else if ((which == SyscallException) && (type == SysCall_Time)){
+       machine->WriteRegister(2, stats->totalTicks);
+
+       // Advance program counters.
+       machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
+       machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
+       machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
+    }
+    else if ((which == SyscallException) && (type == SysCall_Yield)){
+       // Advance program counters.
+       machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
+       machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
+       machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
+
+       currentThread->YieldCPU();
+    }
+    else if ((which == SyscallException) && (type == SysCall_Sleep)){
+       // Advance program counters.
+       machine->WriteRegister(PrevPCReg, machine->ReadRegister(PCReg));
+       machine->WriteRegister(PCReg, machine->ReadRegister(NextPCReg));
+       machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg)+4);
+
+       num_ticks = machine->ReadRegister(4);
+
+       if(num_ticks==0){
+       	  currentThread->YieldCPU();
+       }
+       else{
+       	  timerQueue->SortedInsert((void*)currentThread, stats->totalTicks + num_ticks);
+       	  IntStatus oldLevel = interrupt->SetLevel(IntOff);
+       	  currentThread->PutThreadToSleep();
+       	  (void) interrupt->SetLevel(oldLevel);
+       }
     }
 
     else {

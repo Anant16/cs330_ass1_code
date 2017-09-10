@@ -87,7 +87,7 @@ class NachOSThread {
     int* stackTop;			 // the current stack pointer
     int machineState[MachineStateSize];  // all registers except for stackTop
    
-    static int numThreadsCreated; // added by me(anant).
+    static unsigned numThreadsCreated; // added by me(anant).
     static int ThreadCount;
     int NumOfInstructions;
   public:

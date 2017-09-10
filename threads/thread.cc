@@ -64,7 +64,7 @@ NachOSThread::NachOSThread(char* threadName)
 }
 
 // added by me:
-int NachOSThread :: numThreadsCreated = 0; // added by me
+unsigned NachOSThread :: numThreadsCreated = 0; // added by me
 int NachOSThread :: ThreadCount = 0; //added by me
 //----------------------------------------------------------------------
 // NachOSThread::~NachOSThread
